@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: telecom-db
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - telecom-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    container_name: telecom-backend
+    environment:
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
+      JWT_SECRET: ${JWT_SECRET}
+      FLASK_ENV: production
+    ports:
+      - "5000:5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - telecom-network
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: telecom-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - telecom-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  telecom-network:
+    driver: bridge
